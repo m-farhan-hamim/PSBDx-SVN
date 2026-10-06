@@ -1,4 +1,5 @@
 import java.security.KeyStore
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -26,7 +27,7 @@ val releaseKeystore: File? = runCatching {
     } else {
         val out = layout.buildDirectory.file("signing/release.keystore").get().asFile
         out.parentFile.mkdirs()
-        out.writeBytes(java.util.Base64.getMimeDecoder().decode(b64))
+        out.writeBytes(Base64.getMimeDecoder().decode(b64))
         val ks = KeyStore.getInstance(KeyStore.getDefaultType())
         out.inputStream().use { ks.load(it, releaseStorePassword.toCharArray()) }
         if (ks.containsAlias(releaseKeyAlias)) out else null
