@@ -1,10 +1,26 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFF" android:pathData="M52,34h4v40h-4z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M46,32a8,8 0,1 0,16 0a8,8 0,1 0,-16 0z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M46,76a8,8 0,1 0,16 0a8,8 0,1 0,-16 0z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M72,48a8,8 0,1 0,16 0a8,8 0,1 0,-16 0z" />
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="4" android:fillColor="#00000000"
-        android:pathData="M80,56C80,66 54,58 54,68" />
+    <!-- soft shadow under the glyph -->
+    <group android:translateY="2">
+        <path android:strokeColor="#26000000" android:strokeWidth="5.5" android:strokeLineCap="round"
+            android:fillColor="#00000000" android:pathData="M42,42L42,68" />
+        <path android:strokeColor="#26000000" android:strokeWidth="5.5" android:strokeLineCap="round"
+            android:fillColor="#00000000" android:pathData="M42,66C42,56 70,64 70,54" />
+    </group>
+
+    <!-- trunk -->
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="5.5" android:strokeLineCap="round"
+        android:fillColor="#00000000" android:pathData="M42,42L42,68" />
+    <!-- branch -->
+    <path android:strokeColor="#FFFFD166" android:strokeWidth="5.5" android:strokeLineCap="round"
+        android:fillColor="#00000000" android:pathData="M42,66C42,56 70,64 70,54" />
+
+    <!-- commit nodes (rings) -->
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M34,34a8,8 0,1 0,16 0a8,8 0,1 0,-16 0zM38.5,34a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0z" />
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M34,76a8,8 0,1 0,16 0a8,8 0,1 0,-16 0zM38.5,76a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0z" />
+    <path android:fillColor="#FFFFD166" android:fillType="evenOdd"
+        android:pathData="M62,46a8,8 0,1 0,16 0a8,8 0,1 0,-16 0zM66.5,46a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0z" />
 </vector>
