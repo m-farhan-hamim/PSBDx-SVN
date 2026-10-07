@@ -11,12 +11,14 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
 
+data class RemoteBackup(val id: String, val modifiedAtMs: Long)
+
 /** Minimal Google Drive REST v3 client (appDataFolder) built on plain OkHttp. */
 class DriveClient(private val auth: GoogleAuth, private val http: OkHttpClient) {
 
     suspend fun upload(bytes: ByteArray) = withContext(Dispatchers.IO) {
         val token = auth.accessToken()
-        val existing = findFileId(token)
+        val existing = listBackups(token).firstOrNull()?.id
         val metadata = JSONObject().put("name", FILE_NAME)
         if (existing == null) metadata.put("parents", org.json.JSONArray().put("appDataFolder"))
         val body = MultipartBody.Builder()
@@ -32,10 +34,15 @@ class DriveClient(private val auth: GoogleAuth, private val http: OkHttpClient) 
         http.newCall(req).execute().use { checkOk(it.code, it.body?.string()) }
     }
 
+    /** Metadata of the newest backup, or null when none exists yet. */
+    suspend fun findBackup(): RemoteBackup? = withContext(Dispatchers.IO) {
+        listBackups(auth.accessToken()).firstOrNull()
+    }
+
     /** Returns the encrypted backup blob, or null when no backup exists yet. */
     suspend fun download(): ByteArray? = withContext(Dispatchers.IO) {
         val token = auth.accessToken()
-        val id = findFileId(token) ?: return@withContext null
+        val id = listBackups(token).firstOrNull()?.id ?: return@withContext null
         val req = Request.Builder().url("$API/files/$id?alt=media")
             .header("Authorization", "Bearer $token").build()
         http.newCall(req).execute().use { resp ->
@@ -44,19 +51,37 @@ class DriveClient(private val auth: GoogleAuth, private val http: OkHttpClient) 
         }
     }
 
-    private fun findFileId(token: String): String? {
+    /** Deletes every backup file of this app from Drive ("I forgot my passphrase"). */
+    suspend fun deleteAll() = withContext(Dispatchers.IO) {
+        val token = auth.accessToken()
+        listBackups(token).forEach { f ->
+            val req = Request.Builder().url("$API/files/${f.id}")
+                .header("Authorization", "Bearer $token").delete().build()
+            http.newCall(req).execute().use { if (it.code != 404) checkOk(it.code, it.body?.string()) }
+        }
+    }
+
+    private fun listBackups(token: String): List<RemoteBackup> {
         val url = "$API/files".toHttpUrl().newBuilder()
             .addQueryParameter("spaces", "appDataFolder")
             .addQueryParameter("q", "name = '$FILE_NAME' and trashed = false")
-            .addQueryParameter("fields", "files(id,name)")
-            .addQueryParameter("pageSize", "5")
+            .addQueryParameter("fields", "files(id,name,modifiedTime)")
+            .addQueryParameter("orderBy", "modifiedTime desc")
+            .addQueryParameter("pageSize", "10")
             .build()
         val req = Request.Builder().url(url).header("Authorization", "Bearer $token").build()
         http.newCall(req).execute().use { resp ->
             val body = resp.body?.string().orEmpty()
             checkOk(resp.code, body)
-            val files = JSONObject(body).optJSONArray("files") ?: return null
-            return if (files.length() > 0) files.getJSONObject(0).getString("id") else null
+            val files = JSONObject(body).optJSONArray("files") ?: return emptyList()
+            return (0 until files.length()).map { i ->
+                val o = files.getJSONObject(i)
+                RemoteBackup(
+                    id = o.getString("id"),
+                    modifiedAtMs = runCatching { java.time.Instant.parse(o.optString("modifiedTime")).toEpochMilli() }
+                        .getOrDefault(0L),
+                )
+            }
         }
     }
 

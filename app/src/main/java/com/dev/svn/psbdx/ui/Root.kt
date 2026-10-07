@@ -101,6 +101,7 @@ fun PsbdxRoot(vm: AppViewModel) {
                     }
                 }
                 SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+                DriveSetupHost(vm)
             }
         }
     }
@@ -121,8 +122,9 @@ private fun WithWc(
 }
 
 /**
- * First launch: (1) modal asking about Google Drive auto-backup, (2) backup passphrase,
- * (3) POST_NOTIFICATIONS request (Android 13+), (4) browser sign-in if requested.
+ * First launch: (1) modal asking about Google Drive auto-backup, (2) POST_NOTIFICATIONS request
+ * (Android 13+), (3) browser sign-in if requested. Everything after sign-in (backup check, passphrase,
+ * restore) is handled by DriveSetupHost.
  */
 @Composable
 private fun FirstRunFlow(vm: AppViewModel) {
@@ -156,23 +158,14 @@ private fun FirstRunFlow(vm: AppViewModel) {
             title = { Text("Enable Google Drive auto-backup?") },
             text = {
                 Text(
-                    "Your saved repositories are backed up (encrypted with a passphrase you choose) to a " +
-                        "private app folder in your Google Drive every time you add or change one. " +
-                        "You can use local backup instead, or change this later in Settings.",
+                    "You'll sign in with Google first. Then your saved repositories are backed up " +
+                        "(encrypted with a passphrase you choose) to a private app folder in your Drive " +
+                        "every time you add or change one. If a backup already exists you can restore it. " +
+                        "You can also use local backup, or change this later in Settings.",
                 )
             },
-            confirmButton = { TextButton(onClick = { step = 2 }) { Text("Enable") } },
+            confirmButton = { TextButton(onClick = { finish(true) }) { Text("Enable") } },
             dismissButton = { TextButton(onClick = { finish(false) }) { Text("Not now") } },
-        )
-    }
-    if (step == 2) {
-        TextInputDialog(
-            title = "Choose a backup passphrase",
-            label = "Passphrase",
-            confirmText = "Continue",
-            password = true,
-            onConfirm = { vm.setPassphrase(it); vm.setAutoBackup(true); finish(true) },
-            onDismiss = { finish(false) },
         )
     }
 }
