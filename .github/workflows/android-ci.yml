@@ -35,14 +35,15 @@ jobs:
           java-version: "17"
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.10.2"
+
+      - name: Make wrapper executable
+        run: chmod +x ./gradlew
 
       - name: Unit tests
-        run: gradle --no-daemon --stacktrace testDebugUnitTest
+        run: ./gradlew --no-daemon --stacktrace testDebugUnitTest
 
       - name: Build release APK, release AAB and dev APK
-        run: gradle --no-daemon --stacktrace assembleRelease bundleRelease assembleDev
+        run: ./gradlew --no-daemon --stacktrace assembleRelease bundleRelease assembleDev
 
       - name: Collect the three artifacts
         run: |
