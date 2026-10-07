@@ -1,0 +1,1 @@
+• First release: SVN client, biometric credential gate, encrypted local and Google Drive backup

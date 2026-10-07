@@ -1,0 +1,35 @@
+PSBDx SVN is a modern, fully open-source Subversion client for Android. Check out repositories, edit files, commit and review history from your phone, with your saved credentials protected by biometrics.
+
+<b>Subversion tools</b>
+• Checkout, update, commit, revert and cleanup
+• Built-in file explorer: view, edit, rename, delete, copy, cut, paste and add files and folders
+• Conflict resolution: keep mine, take theirs, or merge by hand
+• Commit history with author, date, message and changed paths
+• Visual diff of your working copy against the base revision
+• Saved repository bookmarks with custom aliases
+
+<b>Bring files in and out</b>
+• Upload files or whole folders from internal storage, SD cards and USB drives with the built-in file browser
+• Export a repository to your Download folder as a clean copy without .svn metadata
+
+<b>Your credentials stay yours</b>
+• Repository URL and username copy with one tap
+• Viewing or copying a password requires fingerprint, face, or your device PIN / pattern
+• Copied passwords are wiped from the clipboard after 30 seconds
+• Credentials are stored with Android Keystore backed encryption
+• System cloud backup is disabled for the app
+
+<b>Backup and restore, the F-Droid way</b>
+• Encrypted backup (AES-256-GCM with your own passphrase) to a local file, works with no account at all
+• Optional Google Drive backup using OAuth 2.0 with PKCE in your browser: no Google Play Services and no closed-source SDKs
+• Automatic backup whenever you add or change a repository, plus manual Backup Now and Restore
+
+<b>Design</b>
+• Material 3 interface with light and dark themes, automatic system switching and a manual override
+
+<b>Good to know</b>
+• Supports http, https and svn:// repositories (svn+ssh is not supported)
+• Browsing storage to upload files uses the "manage all files" permission, requested only when you first upload
+• Google Drive backup is only available in builds that include Google client credentials
+
+Found a bug or have an idea? Use Settings → Contact support to open an issue on GitHub.

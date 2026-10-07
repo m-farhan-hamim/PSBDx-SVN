@@ -121,6 +121,10 @@ class SvnService(private val repo: SvnRepo, val wcDir: File) {
         else if (!src.renameTo(dst)) throw IOException("Could not rename ${src.name}")
     }
 
+    fun isVersioned(file: File): Boolean = withClient {
+        runCatching { it.statusClient.doStatus(file, false).isVersioned }.getOrDefault(false)
+    }
+
     fun status(): List<WcChange> = withClient { m ->
         val out = mutableListOf<WcChange>()
         m.statusClient.doStatus(

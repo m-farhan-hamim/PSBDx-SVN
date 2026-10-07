@@ -1,5 +1,7 @@
 package com.dev.svn.psbdx.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -140,6 +142,23 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                         OutlinedButton(onClick = { ask = Ask.RESTORE }, enabled = linked && !busy) { Text("Restore") }
                     }
                 }
+            }
+
+            Section("Support") {
+                Text(
+                    "Found a bug or have an idea? Open an issue on GitHub.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/m-farhan-hamim/PSBDx-SVN/issues"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        }
+                    },
+                ) { Text("Contact support") }
             }
 
             Section("About") {
