@@ -60,6 +60,16 @@ class BackupManager(private val app: PsbdxApp) {
         }
     }
 
+    /** Newest backup in Drive (null = none), used right after linking an account. */
+    suspend fun checkRemote(): Result<RemoteBackup?> = runCatching {
+        mutex.withLock { drive.findBackup() }
+    }
+
+    /** Permanently removes the existing Drive backup(s). */
+    suspend fun deleteRemote(): Result<Unit> = runCatching {
+        mutex.withLock { drive.deleteAll() }
+    }
+
     /**
      * Event-driven trigger (no periodic timers): called whenever a repository / credential is
      * added or updated. Silent no-op unless Drive auto-backup is fully set up.

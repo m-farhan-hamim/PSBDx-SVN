@@ -118,9 +118,12 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                         Switch(
                             checked = auto,
                             onCheckedChange = { on ->
-                                vm.setAutoBackup(on)
-                                if (on && !hasPass) ask = Ask.PASSPHRASE
-                                if (on && !linked) vm.startLink(activity)
+                                when {
+                                    !on -> vm.setAutoBackup(false)
+                                    !linked -> vm.startLink(activity) // sign in first, then the setup flow runs
+                                    !hasPass -> vm.startDriveSetup()
+                                    else -> vm.setAutoBackup(true)
+                                }
                             },
                         )
                     }
@@ -136,7 +139,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = { if (hasPass) vm.backupNow() else ask = Ask.PASSPHRASE },
+                            onClick = { if (hasPass) vm.backupNow() else vm.startDriveSetup() },
                             enabled = linked && !busy,
                         ) { Text("Backup Now") }
                         OutlinedButton(onClick = { ask = Ask.RESTORE }, enabled = linked && !busy) { Text("Restore") }

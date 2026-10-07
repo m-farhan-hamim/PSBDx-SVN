@@ -25,6 +25,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val autoBackup = MutableStateFlow(app.store.driveAutoBackup)
     val hasPassphrase = MutableStateFlow(!app.store.backupPassphrase.isNullOrEmpty())
     val lastBackup = MutableStateFlow(app.store.lastBackupAt)
+    val driveSetup = MutableStateFlow<DriveSetup>(DriveSetup.Idle)
 
     /** False when the build ships without Google client credentials: Drive UI is disabled. */
     val driveConfigured: Boolean get() = app.googleAuth.isConfigured
@@ -70,8 +71,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             app.googleAuth.handleRedirect(uri)
                 .onSuccess {
                     driveLinked.value = true
-                    message.value = "Google Drive linked"
-                    if (app.store.driveAutoBackup && app.backup.driveReady) backupNow()
+                    startDriveSetup()
                 }
                 .onFailure { message.value = it.message ?: "Sign-in failed" }
         }
@@ -102,6 +102,83 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess { repos.value = app.store.loadRepos(); message.value = "Restored $it repositories" }
                 .onFailure { message.value = it.message ?: "Restore failed" }
             busy.value = false
+        }
+    }
+
+    // ---------- first-time Drive setup: look for an existing backup ----------
+    /** Runs right after Google sign-in (and whenever a linked account has no passphrase yet). */
+    fun startDriveSetup() {
+        driveSetup.value = DriveSetup.Checking
+        viewModelScope.launch {
+            app.backup.checkRemote()
+                .onSuccess { remote ->
+                    driveSetup.value =
+                        if (remote == null) DriveSetup.NewPassphrase(hadExisting = false)
+                        else DriveSetup.Found(remote.modifiedAtMs)
+                }
+                .onFailure {
+                    driveSetup.value = DriveSetup.Idle
+                    message.value = "Couldn't check Google Drive: ${it.message}"
+                }
+        }
+    }
+
+    fun submitExistingPassphrase(passphrase: String) {
+        val cur = driveSetup.value as? DriveSetup.Found ?: return
+        driveSetup.value = cur.copy(busy = true, error = null)
+        viewModelScope.launch {
+            app.backup.restoreFromDrive(passphrase)
+                .onSuccess { n ->
+                    app.store.backupPassphrase = passphrase
+                    hasPassphrase.value = true
+                    setAutoBackup(true)
+                    repos.value = app.store.loadRepos()
+                    message.value = "Restored $n repositories from your Drive backup"
+                    driveSetup.value = DriveSetup.Idle
+                }
+                .onFailure { driveSetup.value = cur.copy(busy = false, error = it.message ?: "Restore failed") }
+        }
+    }
+
+    /** "I forgot my passphrase": delete the old backup, then ask for a new passphrase. */
+    fun forgotPassphrase() {
+        val cur = driveSetup.value as? DriveSetup.Found ?: return
+        driveSetup.value = cur.copy(busy = true, error = null)
+        viewModelScope.launch {
+            app.backup.deleteRemote()
+                .onSuccess { driveSetup.value = DriveSetup.NewPassphrase(hadExisting = true) }
+                .onFailure { driveSetup.value = cur.copy(busy = false, error = it.message ?: "Couldn't delete the backup") }
+        }
+    }
+
+    fun submitNewPassphrase(passphrase: String) {
+        val cur = driveSetup.value as? DriveSetup.NewPassphrase ?: return
+        driveSetup.value = cur.copy(busy = true, error = null)
+        val previous = app.store.backupPassphrase
+        app.store.backupPassphrase = passphrase
+        viewModelScope.launch {
+            app.backup.backupToDrive()
+                .onSuccess {
+                    hasPassphrase.value = true
+                    setAutoBackup(true)
+                    lastBackup.value = app.store.lastBackupAt
+                    message.value = "Backup created"
+                    driveSetup.value = DriveSetup.Idle
+                }
+                .onFailure {
+                    app.store.backupPassphrase = previous
+                    driveSetup.value = cur.copy(busy = false, error = it.message ?: "Backup failed")
+                }
+        }
+    }
+
+    /** Abort the setup: unlink the account and keep auto-backup off. */
+    fun cancelDriveSetup() {
+        driveSetup.value = DriveSetup.Idle
+        viewModelScope.launch {
+            app.googleAuth.signOut()
+            driveLinked.value = false
+            setAutoBackup(false)
         }
     }
 
