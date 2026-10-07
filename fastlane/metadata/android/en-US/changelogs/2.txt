@@ -1,0 +1,6 @@
+• Upload files and folders from internal or external storage with the built-in file browser
+• Copy, cut and paste files and folders, with multi-select
+• Export a repository to the Download folder
+• One + button for create and upload actions
+• Fixed Google Drive sign-in for Android OAuth clients
+• New app icon and a Contact support button
