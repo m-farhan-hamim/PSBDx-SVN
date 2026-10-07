@@ -38,6 +38,7 @@ sealed interface Screen {
     data class Wc(val repoId: String) : Screen
     data class Editor(val repoId: String, val path: String) : Screen
     data class Diff(val repoId: String, val path: String) : Screen
+    data class Picker(val repoId: String, val foldersOnly: Boolean) : Screen
 }
 
 @Composable
@@ -78,6 +79,7 @@ fun PsbdxRoot(vm: AppViewModel) {
                                 onBack = { stack.removeAt(stack.lastIndex) },
                                 onEdit = { stack.add(Screen.Editor(screen.repoId, it)) },
                                 onDiff = { stack.add(Screen.Diff(screen.repoId, it)) },
+                                onPick = { stack.add(Screen.Picker(screen.repoId, it)) },
                             )
                         }
                         is Screen.Editor -> WithWc(screen.repoId, repos) { wvm ->
@@ -85,6 +87,16 @@ fun PsbdxRoot(vm: AppViewModel) {
                         }
                         is Screen.Diff -> WithWc(screen.repoId, repos) { wvm ->
                             DiffScreen(wvm, screen.path) { stack.removeAt(stack.lastIndex) }
+                        }
+                        is Screen.Picker -> WithWc(screen.repoId, repos) { wvm ->
+                            PickerScreen(
+                                foldersOnly = screen.foldersOnly,
+                                onCancel = { stack.removeAt(stack.lastIndex) },
+                                onConfirm = { files ->
+                                    wvm.upload(files)
+                                    stack.removeAt(stack.lastIndex)
+                                },
+                            )
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 package com.dev.svn.psbdx.svn
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -14,6 +15,9 @@ import java.io.File
 
 data class FileRow(val file: File, val isDir: Boolean, val state: ChangeState?)
 
+/** Files waiting to be pasted. [cut] = move, otherwise copy. */
+data class FileClip(val files: List<File>, val cut: Boolean)
+
 class WcViewModel(val repo: SvnRepo) : ViewModel() {
     val svn = SvnService(repo, File(PsbdxApp.instance.workingCopiesDir, repo.id))
 
@@ -25,6 +29,10 @@ class WcViewModel(val repo: SvnRepo) : ViewModel() {
     var busy by mutableStateOf(false)
     var progress by mutableStateOf("")
     var message by mutableStateOf<String?>(null)
+
+    /** Multi-select in the file explorer (absolute paths, survives folder navigation). */
+    val selected = mutableStateListOf<String>()
+    var clip by mutableStateOf<FileClip?>(null)
 
     init {
         svn.onProgress = { progress = it }
@@ -107,6 +115,115 @@ class WcViewModel(val repo: SvnRepo) : ViewModel() {
         val f = File(currentDir, name)
         if (f.exists() || !f.createNewFile()) throw java.io.IOException("Could not create $name")
         if (svn.isCheckedOut) svn.add(f)
+    }
+
+    /** Copies files / folders from anywhere on the device into the open folder and schedules them for add. */
+    fun upload(sources: List<File>) = op {
+        val added = mutableListOf<File>()
+        val destDir = currentDir.canonicalFile
+        sources.forEach { src ->
+            val canon = src.canonicalFile
+            if (destDir == canon || destDir.path.startsWith(canon.path + File.separator)) {
+                throw java.io.IOException("Can't copy ${src.name} into itself")
+            }
+            val dst = uniqueTarget(currentDir, src.name)
+            copyTree(src, dst)
+            added += dst
+        }
+        if (svn.isCheckedOut) added.forEach { svn.add(it) }
+        message = "Added ${added.size} item(s) to the repository"
+    }
+
+    private fun uniqueTarget(dir: File, name: String): File {
+        var f = File(dir, name)
+        if (!f.exists()) return f
+        val base = name.substringBeforeLast('.', name)
+        val ext = name.substringAfterLast('.', "").let { if (it.isEmpty() || base == name) "" else ".$it" }
+        var i = 1
+        while (f.exists()) { f = File(dir, "$base ($i)$ext"); i++ }
+        return f
+    }
+
+    private fun copyTree(src: File, dst: File) {
+        if (java.nio.file.Files.isSymbolicLink(src.toPath())) return
+        if (src.isDirectory) {
+            dst.mkdirs()
+            src.listFiles()?.forEach { if (it.name != ".svn") copyTree(it, File(dst, it.name)) }
+        } else {
+            progress = src.name
+            src.copyTo(dst)
+        }
+    }
+
+    /** svn export into Download/PSBDx-SVN/<alias>-<timestamp>. */
+    fun exportToDownloads() = op {
+        val where = com.dev.svn.psbdx.storage.Exporter.exportToDownloads(
+            PsbdxApp.instance, svn.wcDir, repo.alias,
+        ) { progress = it }
+        message = "Exported to $where"
+    }
+
+    // ---------- selection, copy / cut / paste ----------
+    fun toggleSelect(file: File) {
+        val p = file.absolutePath
+        if (!selected.remove(p)) selected.add(p)
+    }
+
+    fun clearSelection() = selected.clear()
+
+    fun selectAll() {
+        entries.forEach { if (it.file.absolutePath !in selected) selected.add(it.file.absolutePath) }
+    }
+
+    private fun setClip(files: List<File>, cut: Boolean) {
+        if (files.isEmpty()) return
+        clip = FileClip(files, cut)
+        selected.clear()
+        message = "${files.size} item(s) ${if (cut) "cut" else "copied"} — open a folder and tap Paste"
+    }
+
+    fun copySelected() = setClip(selected.map { File(it) }, cut = false)
+    fun cutSelected() = setClip(selected.map { File(it) }, cut = true)
+    fun copyOne(file: File) = setClip(listOf(file), cut = false)
+    fun cutOne(file: File) = setClip(listOf(file), cut = true)
+    fun clearClip() { clip = null }
+
+    fun paste() {
+        val c = clip ?: return
+        val target = currentDir
+        op {
+            val done = mutableListOf<File>()
+            val destCanon = target.canonicalFile
+            c.files.forEach { src ->
+                if (!src.exists()) return@forEach
+                val canon = src.canonicalFile
+                if (destCanon == canon || destCanon.path.startsWith(canon.path + File.separator)) {
+                    throw java.io.IOException("Can't paste ${src.name} into itself")
+                }
+                if (c.cut && src.parentFile?.canonicalFile == destCanon) return@forEach // already here
+                val dst = uniqueTarget(target, src.name)
+                if (c.cut) {
+                    if (svn.isCheckedOut && svn.isVersioned(src)) svn.rename(src, dst, versioned = true)
+                    else if (!src.renameTo(dst)) { copyTree(src, dst); src.deleteRecursively() }
+                } else {
+                    copyTree(src, dst)
+                }
+                done += dst
+            }
+            if (!c.cut && svn.isCheckedOut) done.forEach { svn.add(it) }
+            if (c.cut) clip = null
+            message = "${if (c.cut) "Moved" else "Pasted"} ${done.size} item(s)"
+        }
+    }
+
+    fun deleteSelected() {
+        val files = selected.map { File(it) }
+        selected.clear()
+        op("Deleted ${files.size} item(s)") {
+            files.forEach { f ->
+                if (svn.isCheckedOut && svn.isVersioned(f)) svn.delete(f) else f.deleteRecursively()
+            }
+        }
     }
 
     fun loadLog() {
