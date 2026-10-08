@@ -1,5 +1,18 @@
 # 🚀 PSBDx-SVN
 
+
+---
+
+<div align="center">
+
+### ⭐ Star this repository if you find it useful!
+
+[![GitHub Stars](https://img.shields.io/github/stars/m-farhan-hamim/PSBDx-SVN?style=social)](https://github.com/m-farhan-hamim/PSBDx-SVN)
+[![GitHub Forks](https://img.shields.io/github/forks/m-farhan-hamim/PSBDx-SVN?style=social)](https://github.com/m-farhan-hamim/PSBDx-SVN/fork)
+
+</div>
+
+---
 <div align="center">
 
 [![GitHub](https://img.shields.io/badge/GitHub-m--farhan--hamim%2FPSBDx--SVN-181717?style=for-the-badge&logo=github)](https://github.com/m-farhan-hamim/PSBDx-SVN)
@@ -258,11 +271,6 @@ See the [LICENSE](https://github.com/m-farhan-hamim/PSBDx-SVN/blob/main/LICENSE)
 ---
 
 <div align="center">
-
-### ⭐ Star this repository if you find it useful!
-
-[![GitHub Stars](https://img.shields.io/github/stars/m-farhan-hamim/PSBDx-SVN?style=social)](https://github.com/m-farhan-hamim/PSBDx-SVN)
-[![GitHub Forks](https://img.shields.io/github/forks/m-farhan-hamim/PSBDx-SVN?style=social)](https://github.com/m-farhan-hamim/PSBDx-SVN/fork)
 
 **Made with ❤️ by [M. Farhan Hamim](https://github.com/m-farhan-hamim)**
 
