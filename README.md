@@ -9,6 +9,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/m-farhan-hamim/PSBDx-SVN?style=social)](https://github.com/m-farhan-hamim/PSBDx-SVN)
 [![GitHub Forks](https://img.shields.io/github/forks/m-farhan-hamim/PSBDx-SVN?style=social)](https://github.com/m-farhan-hamim/PSBDx-SVN/fork)
+[![GitHub Issues](https://img.shields.io/github/issues/m-farhan-hamim/PSBDx-SVN?style=social)](https://github.com/m-farhan-hamim/PSBDx-SVN/issues)
 
 </div>
 
