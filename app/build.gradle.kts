@@ -68,8 +68,8 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release")
-            else signingConfigs.getByName("debug")
+            // single line on purpose: F-Droid's key-stripping removes this whole line
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "release" else "debug")
         }
         debug {
             buildConfigField("boolean", "DEV_BUILD", "true")
