@@ -17,11 +17,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Every secret is optional. Missing values (forks, PRs) become empty strings and
-    # app/build.gradle.kts falls back to debug signing / a disabled Google Drive UI.
+    # Signing secrets are optional. Missing values (forks, PRs) become empty strings and
+    # app/build.gradle.kts falls back to debug signing. The Google client ID is a public value
+    # committed in gradle.properties; no Google secret is injected, so builds stay reproducible.
     env:
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       RELEASE_KEYALIAS: ${{ secrets.RELEASE_KEYALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
@@ -62,3 +61,37 @@ jobs:
             dist/app-release.aab
             dist/app-dev.apk
           if-no-files-found: error
+
+  # F-Droid verifies that its own build equals the published APK. Approximate that here:
+  # build twice from a clean tree in a different directory and time zone, then compare.
+  reproducible:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build A
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --no-build-cache assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/a.apk"
+
+      - name: Build B (other path, other time zone, clean tree)
+        env:
+          TZ: Asia/Dhaka
+        run: |
+          mkdir -p "$HOME/elsewhere/psbdx-copy"
+          rsync -a --exclude .git --exclude build --exclude .gradle ./ "$HOME/elsewhere/psbdx-copy/"
+          cd "$HOME/elsewhere/psbdx-copy"
+          ./gradlew --no-daemon --no-build-cache assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/b.apk"
+
+      - name: Compare (signature ignored)
+        run: python3 scripts/compare_apks.py "$RUNNER_TEMP/a.apk" "$RUNNER_TEMP/b.apk"

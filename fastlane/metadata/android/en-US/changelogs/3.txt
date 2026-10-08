@@ -1,0 +1,2 @@
+• Reproducible builds for F-Droid (deterministic APK, no baseline profile)
+• Google Drive: the sign-in client ID is now part of the source
