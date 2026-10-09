@@ -35,8 +35,11 @@ val releaseKeystore: File? = runCatching {
 }.getOrNull()
 val hasReleaseSigning = releaseKeystore != null
 
-val googleClientId = secret("GOOGLE_CLIENT_ID")
-val googleClientSecret = secret("GOOGLE_CLIENT_SECRET")
+// Reproducible builds: both values come from gradle properties ONLY (never from CI environment
+// variables), so a GitHub build and an F-Droid build embed identical BuildConfig constants.
+// The client ID is public and committed in gradle.properties; Android OAuth clients have no secret.
+val googleClientId = (project.findProperty("GOOGLE_CLIENT_ID") as String?)?.trim().orEmpty()
+val googleClientSecret = (project.findProperty("GOOGLE_CLIENT_SECRET") as String?)?.trim().orEmpty()
 
 android {
     namespace = "com.dev.svn.psbdx"
@@ -46,8 +49,8 @@ android {
         applicationId = "com.dev.svn.psbdx"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
 
         buildConfigField("String", "GOOGLE_CLIENT_ID", quoted(googleClientId))
         buildConfigField("String", "GOOGLE_CLIENT_SECRET", quoted(googleClientSecret))
@@ -142,4 +145,10 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+}
+
+// Reproducible builds: ART baseline-profile generation is not deterministic across machines
+// (assets/dexopt/baseline.prof differed between the GitHub and F-Droid builds).
+tasks.configureEach {
+    if (name.contains("ArtProfile")) enabled = false
 }
