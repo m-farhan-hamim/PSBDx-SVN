@@ -34,6 +34,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun toast(text: String) { message.value = text }
     fun consumeMessage() { message.value = null }
 
+    private fun restoredMessage(n: Int, suffix: String = ""): String {
+        val pending = app.backup.pendingCount()
+        return "Restored $n repositories$suffix" +
+            if (pending > 0) ". Uncommitted edits in $pending repo(s) are re-applied when you check them out." else ""
+    }
+
     // ---------- repositories ----------
     fun saveRepo(alias: String, url: String, user: String, pass: String, existing: SvnRepo?) {
         val repo = SvnRepo(
@@ -48,6 +54,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteRepo(repo: SvnRepo) {
         viewModelScope.launch(Dispatchers.IO) {
             File(app.workingCopiesDir, repo.id).deleteRecursively()
+            com.dev.svn.psbdx.backup.PendingChanges.delete(app, repo.id)
         }
         persist(repos.value.filter { it.id != repo.id })
     }
@@ -99,7 +106,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             busy.value = true
             app.backup.restoreFromDrive(passphrase)
-                .onSuccess { repos.value = app.store.loadRepos(); message.value = "Restored $it repositories" }
+                .onSuccess { repos.value = app.store.loadRepos(); message.value = restoredMessage(it) }
                 .onFailure { message.value = it.message ?: "Restore failed" }
             busy.value = false
         }
@@ -133,7 +140,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     hasPassphrase.value = true
                     setAutoBackup(true)
                     repos.value = app.store.loadRepos()
-                    message.value = "Restored $n repositories from your Drive backup"
+                    message.value = restoredMessage(n, " from your Drive backup")
                     driveSetup.value = DriveSetup.Idle
                 }
                 .onFailure { driveSetup.value = cur.copy(busy = false, error = it.message ?: "Restore failed") }
@@ -211,7 +218,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.onSuccess {
                 repos.value = app.store.loadRepos()
-                message.value = "Restored $it repositories"
+                message.value = restoredMessage(it)
             }.onFailure { message.value = it.message ?: "Import failed" }
             busy.value = false
         }

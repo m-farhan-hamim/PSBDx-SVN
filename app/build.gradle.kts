@@ -49,8 +49,8 @@ android {
         applicationId = "com.dev.svn.psbdx"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.1.2"
 
         buildConfigField("String", "GOOGLE_CLIENT_ID", quoted(googleClientId))
         buildConfigField("String", "GOOGLE_CLIENT_SECRET", quoted(googleClientSecret))
@@ -151,4 +151,16 @@ dependencies {
 // (assets/dexopt/baseline.prof differed between the GitHub and F-Droid builds).
 tasks.configureEach {
     if (name.contains("ArtProfile")) enabled = false
+}
+
+// Nightly / alpha builds: the workflow passes -PVERSION_NAME_OVERRIDE=NIGHTLY-<version> and the prefix is
+// applied to the built manifest only. The source keeps the plain literal versionName above, which is also
+// what F-Droid's update checker reads. Without the property (F-Droid, local builds) nothing changes.
+androidComponents {
+    onVariants { variant ->
+        val override = (project.findProperty("VERSION_NAME_OVERRIDE") as String?)?.trim().orEmpty()
+        if (override.isNotEmpty()) {
+            variant.outputs.forEach { it.versionName.set(override) }
+        }
+    }
 }
