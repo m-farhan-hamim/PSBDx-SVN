@@ -152,3 +152,15 @@ dependencies {
 tasks.configureEach {
     if (name.contains("ArtProfile")) enabled = false
 }
+
+// Nightly / alpha builds: the workflow passes -PVERSION_NAME_OVERRIDE=NIGHTLY-<version> and the prefix is
+// applied to the built manifest only. The source keeps the plain literal versionName above, which is also
+// what F-Droid's update checker reads. Without the property (F-Droid, local builds) nothing changes.
+androidComponents {
+    onVariants { variant ->
+        val override = (project.findProperty("VERSION_NAME_OVERRIDE") as String?)?.trim().orEmpty()
+        if (override.isNotEmpty()) {
+            variant.outputs.forEach { it.versionName.set(override) }
+        }
+    }
+}

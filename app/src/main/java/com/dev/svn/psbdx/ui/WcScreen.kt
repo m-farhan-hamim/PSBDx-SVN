@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
@@ -291,6 +292,7 @@ private fun StateBadge(state: ChangeState) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FilesTab(vm: WcViewModel, onEdit: (String) -> Unit, onDiff: (String) -> Unit, onMenu: (WcDialog) -> Unit) {
+    val context = LocalContext.current
     var menuFor by remember { mutableStateOf<String?>(null) }
     val rel = vm.currentDir.relativeTo(vm.svn.wcDir).path
     val selecting = vm.selected.isNotEmpty()
@@ -367,6 +369,12 @@ private fun FilesTab(vm: WcViewModel, onEdit: (String) -> Unit, onDiff: (String)
                             IconButton(onClick = { menuFor = path }) { Icon(Icons.Default.MoreVert, "Actions") }
                             DropdownMenu(expanded = menuFor == path, onDismissRequest = { menuFor = null }) {
                                 DropdownMenuItem(text = { Text("Select") }, onClick = { menuFor = null; vm.toggleSelect(row.file) })
+                                if (!row.isDir && row.file.exists()) {
+                                    DropdownMenuItem(text = { Text("Open with…") }, onClick = {
+                                        menuFor = null
+                                        if (!openWith(context, row.file)) vm.message = "No app can open this file"
+                                    })
+                                }
                                 DropdownMenuItem(text = { Text("Copy") }, onClick = { menuFor = null; vm.copyOne(row.file) })
                                 DropdownMenuItem(text = { Text("Cut") }, onClick = { menuFor = null; vm.cutOne(row.file) })
                                 DropdownMenuItem(text = { Text("Rename") }, onClick = { menuFor = null; onMenu(WcDialog.Rename(row)) })

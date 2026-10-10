@@ -1,4 +1,4 @@
-• Uncommitted edits are now included in Google Drive and local backups and re-applied when you check a repository out again
+• Uncommitted edits are included in Drive and local backups and re-applied after checkout
 • Fixed a crash when checking out from svn:// servers
-• Loading animation while folders open
-• One-tap "Restore missing files"
+• Smooth editing of long files; big or binary files open with other apps
+• Loading animations, one-tap "Restore missing files"

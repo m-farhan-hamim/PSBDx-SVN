@@ -1,0 +1,137 @@
+name: Beta
+
+# Manual only. Publishes a signed pre-release whose tag equals its versionName (F-Droid's Binaries URL uses %v).
+# The version written into the source for this build is BETA-<version>, so F-Droid (which rebuilds the
+# tagged commit and compares it with the published APK) sees the very same versionName.
+# The extra version commit is only tagged: the branch itself stays untouched unless "commit_to_branch" is ticked.
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "Release notes (optional, otherwise generated from the commits)"
+        required: false
+        default: ""
+      commit_to_branch:
+        description: "Also push the version commit to the branch this workflow runs on"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: beta
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      RELEASE_KEYALIAS: ${{ secrets.RELEASE_KEYALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+      RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Work out the version
+        id: ver
+        run: |
+          BASE=$(grep -m1 -oP '^\s*versionName = "\K[^"]+' app/build.gradle.kts | sed -E 's/^[A-Za-z]+-//')
+          test -n "$BASE" || { echo "versionName not found in app/build.gradle.kts"; exit 1; }
+          VERSION="BETA-$BASE"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists. Bump versionName / versionCode first (published releases are never overwritten)."
+            exit 1
+          fi
+
+      - name: Require release signing
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "KEYSTORE_BASE64 is not set, refusing to publish a debug-signed build"; exit 1; }
+
+      - name: Write the version into the source and commit it
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          v = os.environ["VERSION"]
+          p = "app/build.gradle.kts"
+          s = open(p).read()
+          s, n = re.subn(r'(?m)^(\s*versionName = ")[^"]*(")', lambda m: m.group(1) + v + m.group(2), s, count=1)
+          assert n == 1, "versionName line not found"
+          open(p, "w").write(s)
+          PY
+          git config user.name "$ACTOR"
+          git config user.email "${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Source already carries $VERSION, nothing to commit"
+          else
+            git commit -am "release: $VERSION"
+          fi
+
+      - name: Unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --stacktrace testDebugUnitTest
+
+      - name: Build signed release APK and AAB
+        run: ./gradlew --no-daemon --no-build-cache --stacktrace assembleRelease bundleRelease
+
+      - name: Verify signature and version
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee certs.txt
+          if grep -q "CN=Android Debug" certs.txt; then echo "debug-signed APK, aborting"; exit 1; fi
+          "$BT/aapt2" dump badging app/build/outputs/apk/release/app-release.apk | tee badging.txt | head -1
+          grep -q "versionName='$VERSION'" badging.txt || { echo "APK versionName is not $VERSION"; exit 1; }
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/first.apk"
+
+      - name: Reproducibility gate (second build from a clean copy in another folder and time zone)
+        env:
+          TZ: Asia/Dhaka
+        run: |
+          mkdir -p "$HOME/elsewhere/psbdx-copy"
+          rsync -a --exclude .git --exclude build --exclude .gradle ./ "$HOME/elsewhere/psbdx-copy/"
+          (cd "$HOME/elsewhere/psbdx-copy" && ./gradlew --no-daemon --no-build-cache assembleRelease)
+          python3 scripts/compare_apks.py "$RUNNER_TEMP/first.apk" "$HOME/elsewhere/psbdx-copy/app/build/outputs/apk/release/app-release.apk"
+
+      - name: Tag the version commit
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          COMMIT_TO_BRANCH: ${{ inputs.commit_to_branch }}
+        run: |
+          git tag "$VERSION" HEAD
+          git push origin "refs/tags/$VERSION"
+          if [ "$COMMIT_TO_BRANCH" = "true" ]; then
+            git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          fi
+
+      - name: Publish GitHub pre-release
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/
+          cp app/build/outputs/bundle/release/app-release.aab dist/
+          if [ -n "$NOTES" ]; then NOTE_ARGS=(--notes "$NOTES"); else NOTE_ARGS=(--generate-notes); fi
+          gh release create "$VERSION" dist/app-release.apk dist/app-release.aab \
+            --title "$VERSION" --prerelease --verify-tag "${NOTE_ARGS[@]}"

@@ -1,6 +1,16 @@
 package com.dev.svn.psbdx.ui
 
 import androidx.activity.compose.BackHandler
+import android.widget.Toast
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -22,22 +32,54 @@ import com.dev.svn.psbdx.svn.WcViewModel
 import kotlinx.coroutines.launch
 import java.io.File
 
+private const val SINGLE_FIELD_MAX_CHARS = 30_000
+private const val CHUNK_LINES = 150
+
+/**
+ * Short files: one text field. Long files: the text is cut into blocks of [CHUNK_LINES] lines shown
+ * in a lazy list, so only the visible blocks are laid out (a single huge text field gets slower with
+ * every keystroke). Binary files and files over 5 MB are handed to Android's "Open with" instead.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditorScreen(vm: WcViewModel, path: String, onBack: () -> Unit) {
+    val context = LocalContext.current
     val file = remember(path) { File(path) }
     var text by remember(path) { mutableStateOf("") }
     var original by remember(path) { mutableStateOf("") }
+    val chunks = remember(path) { mutableStateListOf<String>() }
+    var chunked by remember(path) { mutableStateOf(false) }
+    var chunkDirty by remember(path) { mutableStateOf(false) }
+    var hasConflict by remember(path) { mutableStateOf(false) }
     var loaded by remember(path) { mutableStateOf(false) }
-    var binary by remember(path) { mutableStateOf(false) }
+    var external by remember(path) { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val dirty = loaded && !binary && text != original
+    val dirty = loaded && !external && (if (chunked) chunkDirty else text != original)
+
+    fun openExternally() {
+        if (!openWith(context, file)) Toast.makeText(context, "No app can open this file", Toast.LENGTH_LONG).show()
+    }
 
     LaunchedEffect(path) {
         val t = vm.readText(file)
-        if (t == null) binary = true else { text = t; original = t }
+        if (t == null) {
+            external = true
+        } else {
+            hasConflict = t.contains("<<<<<<<") && t.contains(">>>>>>>")
+            if (t.length > SINGLE_FIELD_MAX_CHARS) {
+                val parts = withContext(Dispatchers.Default) {
+                    t.split("\n").chunked(CHUNK_LINES).map { it.joinToString("\n") }
+                }
+                chunks.addAll(parts)
+                chunked = true
+            } else {
+                text = t
+                original = t
+            }
+        }
         loaded = true
+        if (external) openExternally() // binary / too large: go straight to the system chooser
     }
     BackHandler(dirty) { confirmDiscard = true }
 
@@ -51,12 +93,18 @@ fun EditorScreen(vm: WcViewModel, path: String, onBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { openExternally() }) {
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, "Open with")
+                    }
                     IconButton(
                         enabled = dirty,
                         onClick = {
                             scope.launch {
-                                vm.writeText(file, text)
-                                original = text
+                                val content = if (chunked) {
+                                    withContext(Dispatchers.Default) { chunks.joinToString("\n") }
+                                } else text
+                                vm.writeText(file, content)
+                                if (chunked) chunkDirty = false else original = content
                                 vm.message = "Saved ${file.name}"
                             }
                         },
@@ -68,12 +116,23 @@ fun EditorScreen(vm: WcViewModel, path: String, onBack: () -> Unit) {
         Column(Modifier.fillMaxSize().padding(pad)) {
             when {
                 !loaded -> ShimmerList(rows = 4)
-                binary -> Text(
-                    "This file is binary or larger than 1 MB and can't be edited here.",
-                    Modifier.padding(16.dp),
-                )
+                external -> Column(
+                    Modifier.fillMaxSize().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(Icons.Default.InsertDriveFile, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "This file is binary or larger than 5 MB, so it can't be edited in the app.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { openExternally() }) { Text("Open with…") }
+                }
                 else -> {
-                    if (text.contains("<<<<<<<") && text.contains(">>>>>>>")) {
+                    if (hasConflict) {
                         Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 "Conflict markers found. Merge the sections by hand, save, then mark the file as resolved in Changes (Merged).",
@@ -81,11 +140,31 @@ fun EditorScreen(vm: WcViewModel, path: String, onBack: () -> Unit) {
                             )
                         }
                     }
-                    OutlinedTextField(
-                        value = text, onValueChange = { text = it },
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                    val style = TextStyle(
+                        fontFamily = FontFamily.Monospace, fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
+                    if (chunked) {
+                        LazyColumn(Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(12.dp)) {
+                            items(count = chunks.size, key = { it }) { i ->
+                                BasicTextField(
+                                    value = chunks[i],
+                                    onValueChange = { v ->
+                                        if (v != chunks[i]) { chunks[i] = v; chunkDirty = true }
+                                    },
+                                    textStyle = style,
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = text, onValueChange = { text = it },
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            textStyle = style,
+                        )
+                    }
                 }
             }
         }

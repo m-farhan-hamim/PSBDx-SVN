@@ -311,7 +311,7 @@ class WcViewModel(val repo: SvnRepo) : ViewModel() {
     }
 
     suspend fun readText(file: File): String? = withContext(Dispatchers.IO) {
-        if (file.length() > 1_000_000) return@withContext null
+        if (file.length() > 5_000_000) return@withContext null
         val bytes = file.readBytes()
         if (bytes.any { it == 0.toByte() }) null else String(bytes, Charsets.UTF_8)
     }
