@@ -75,12 +75,19 @@ class SvnService(private val repo: SvnRepo, val wcDir: File) {
         }
     }
 
-    fun checkout(): Long = withClient {
+    /** [revision] = null checks out HEAD. */
+    fun checkout(revision: Long? = null): Long = withClient {
         wcDir.mkdirs()
+        val rev = if (revision != null) SVNRevision.create(revision) else SVNRevision.HEAD
         it.updateClient.doCheckout(
             SVNURL.parseURIEncoded(repo.url.trim()), wcDir,
-            SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true,
+            SVNRevision.HEAD, rev, SVNDepth.INFINITY, true,
         )
+    }
+
+    /** Revision the working copy is based on. */
+    fun baseRevision(): Long = withClient {
+        it.wcClient.doInfo(wcDir, SVNRevision.WORKING).revision.number
     }
 
     fun update(): Long = withClient {

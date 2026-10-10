@@ -36,6 +36,14 @@ class PsbdxApp : Application() {
         // SVNKit looks for ~/.subversion; point it somewhere writable on Android.
         System.setProperty("user.home", filesDir.absolutePath)
         System.setProperty("svnkit.library.gnome-keyring.enabled", "false")
+        // Android has no javax.security.sasl / javax.security.auth.login. SVNKit would pick its SASL
+        // authenticator first for svn:// logins and die with NoClassDefFoundError (an Error, so it
+        // took the whole app down) the moment the server asks for CRAM-MD5. Use the built-in plain
+        // authenticator instead and drop HTTP "Negotiate" (needs LoginContext).
+        val plain = "org.tmatesoft.svn.core.internal.io.svn.SVNPlainAuthenticator"
+        System.setProperty("svnkit.saslauthenticator.1", plain)
+        System.setProperty("svnkit.saslauthenticator.2", plain)
+        System.setProperty("svnkit.http.methods", "Basic,Digest,NTLM")
         DAVRepositoryFactory.setup()
         SVNRepositoryFactoryImpl.setup()
         Notifier.ensureChannel(this)

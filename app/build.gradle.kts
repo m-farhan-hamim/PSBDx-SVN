@@ -49,8 +49,8 @@ android {
         applicationId = "com.dev.svn.psbdx"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.1.2"
 
         buildConfigField("String", "GOOGLE_CLIENT_ID", quoted(googleClientId))
         buildConfigField("String", "GOOGLE_CLIENT_SECRET", quoted(googleClientSecret))

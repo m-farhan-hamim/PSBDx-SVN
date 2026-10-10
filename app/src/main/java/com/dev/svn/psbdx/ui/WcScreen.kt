@@ -174,7 +174,7 @@ fun WcScreen(
     ) { pad ->
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().padding(pad)) {
-                if (vm.busy) {
+                if (vm.busy || vm.listing) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     if (vm.progress.isNotEmpty()) {
                         Text(
@@ -326,7 +326,7 @@ private fun FilesTab(vm: WcViewModel, onEdit: (String) -> Unit, onDiff: (String)
         }
     }
 
-    if (vm.busy && vm.entries.isEmpty()) { ShimmerList(); return }
+    if ((vm.busy || vm.listing) && vm.entries.isEmpty()) { ShimmerList(); return }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
         if (!vm.atRoot) item(key = "..") {
             ListItem(
@@ -391,6 +391,7 @@ private fun FilesTab(vm: WcViewModel, onEdit: (String) -> Unit, onDiff: (String)
 
 @Composable
 private fun ChangesTab(vm: WcViewModel, onEdit: (String) -> Unit, onDiff: (String) -> Unit, onRevert: (File) -> Unit) {
+    if (vm.listing && vm.changes.isEmpty()) { ShimmerList(); return }
     if (vm.changes.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -401,6 +402,13 @@ private fun ChangesTab(vm: WcViewModel, onEdit: (String) -> Unit, onDiff: (Strin
         return
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
+        if (vm.changes.any { it.state == ChangeState.MISSING }) item(key = "restoremissing") {
+            FilledTonalButton(onClick = { vm.restoreMissing() }, modifier = Modifier.padding(16.dp, 8.dp)) {
+                Icon(Icons.Default.Undo, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Restore missing files")
+            }
+        }
         if (vm.changes.any { it.state == ChangeState.UNVERSIONED }) item(key = "addall") {
             FilledTonalButton(onClick = { vm.addAllUnversioned() }, modifier = Modifier.padding(16.dp, 8.dp)) {
                 Icon(Icons.Default.Add, null, Modifier.size(18.dp))
