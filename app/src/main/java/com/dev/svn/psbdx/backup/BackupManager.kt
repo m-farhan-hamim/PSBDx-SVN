@@ -2,9 +2,11 @@ package com.dev.svn.psbdx.backup
 
 import com.dev.svn.psbdx.PsbdxApp
 import com.dev.svn.psbdx.data.SecureStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
 
@@ -47,7 +49,9 @@ class BackupManager(private val app: PsbdxApp) {
             val pass = app.store.backupPassphrase
                 ?: throw IOException("Set a backup passphrase first")
             if (!app.googleAuth.isSignedIn) throw IOException("Google Drive is not linked")
-            drive.upload(buildEncrypted(pass))
+            // key derivation is heavy: never on the main thread
+            val bytes = withContext(Dispatchers.IO) { buildEncrypted(pass) }
+            drive.upload(bytes)
             app.store.lastBackupAt = System.currentTimeMillis()
         }
         Notifier.backupSucceeded(app, "Your repositories were backed up to Google Drive.")
@@ -56,7 +60,7 @@ class BackupManager(private val app: PsbdxApp) {
     suspend fun restoreFromDrive(passphrase: String): Result<Int> = runCatching {
         mutex.withLock {
             val blob = drive.download() ?: throw IOException("No backup found in Google Drive")
-            restoreFrom(blob, passphrase)
+            withContext(Dispatchers.IO) { restoreFrom(blob, passphrase) }
         }
     }
 

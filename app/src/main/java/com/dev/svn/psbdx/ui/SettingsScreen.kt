@@ -29,6 +29,10 @@ private enum class Ask { PASSPHRASE, EXPORT, IMPORT, RESTORE }
 fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
+    val versionName = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
+            ?: BuildConfig.VERSION_NAME
+    }
     val theme by vm.themeMode.collectAsStateWithLifecycle()
     val linked by vm.driveLinked.collectAsStateWithLifecycle()
     val auto by vm.autoBackup.collectAsStateWithLifecycle()
@@ -165,7 +169,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             }
 
             Section("About") {
-                Text("PSBDx SVN ${BuildConfig.VERSION_NAME}" + if (BuildConfig.DEV_BUILD) "  (developer build)" else "")
+                Text("PSBDx SVN $versionName" + if (BuildConfig.DEV_BUILD) "  (developer build)" else "")
                 Text(
                     "Passwords are kept in EncryptedSharedPreferences (Android Keystore) and are only shown or " +
                         "copied after biometric / device-credential authentication.",

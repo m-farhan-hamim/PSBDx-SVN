@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.dev.svn.psbdx.storage.StorageRoot
 import com.dev.svn.psbdx.storage.StorageRoots
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -22,12 +23,13 @@ import java.io.File
  * The app's own file browser (not Android's document picker).
  * foldersOnly: open a folder and press the tick to copy that folder into the repository.
  * otherwise: tick any number of files / folders, then press the tick.
+ * A skeleton loader is shown while storage volumes or a folder are being read.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PickerScreen(foldersOnly: Boolean, onCancel: () -> Unit, onConfirm: (List<File>) -> Unit) {
     val context = LocalContext.current
-    val roots = remember { StorageRoots.list(context) }
+    var roots by remember { mutableStateOf<List<StorageRoot>?>(null) }
     var dir by remember { mutableStateOf<File?>(null) }
     var showHidden by remember { mutableStateOf(false) }
     val selected = remember { mutableStateListOf<String>() }
@@ -35,9 +37,14 @@ fun PickerScreen(foldersOnly: Boolean, onCancel: () -> Unit, onConfirm: (List<Fi
     var unreadable by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
 
+    // scanning /storage and canonicalising paths can be slow: keep it off the main thread
+    LaunchedEffect(Unit) { roots = withContext(Dispatchers.IO) { StorageRoots.list(context) } }
+
     LaunchedEffect(dir, showHidden) {
         val d = dir
-        if (d == null) { entries = emptyList(); unreadable = false; return@LaunchedEffect }
+        entries = emptyList() // drop the previous folder immediately so the skeleton is what the user sees
+        unreadable = false
+        if (d == null) { loading = false; return@LaunchedEffect }
         loading = true
         val list = withContext(Dispatchers.IO) { d.listFiles() }
         unreadable = list == null
@@ -47,7 +54,7 @@ fun PickerScreen(foldersOnly: Boolean, onCancel: () -> Unit, onConfirm: (List<Fi
         loading = false
     }
 
-    val atRoot = dir != null && roots.any { it.dir == dir }
+    val atRoot = dir != null && roots?.any { it.dir == dir } == true
     BackHandler {
         when {
             dir == null -> onCancel()
@@ -62,9 +69,7 @@ fun PickerScreen(foldersOnly: Boolean, onCancel: () -> Unit, onConfirm: (List<Fi
                 title = {
                     Column {
                         Text(if (dir == null) "Select storage" else dir!!.name.ifEmpty { "/" }, maxLines = 1)
-                        dir?.let {
-                            Text(it.path, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                        }
+                        dir?.let { Text(it.path, style = MaterialTheme.typography.labelSmall, maxLines = 1) }
                     }
                 },
                 navigationIcon = { IconButton(onClick = onCancel) { Icon(Icons.Default.Close, "Cancel") } },
@@ -80,7 +85,7 @@ fun PickerScreen(foldersOnly: Boolean, onCancel: () -> Unit, onConfirm: (List<Fi
         },
         floatingActionButton = {
             if (foldersOnly) {
-                if (dir != null) FloatingActionButton(onClick = { onConfirm(listOf(dir!!)) }) {
+                if (dir != null && !loading) FloatingActionButton(onClick = { onConfirm(listOf(dir!!)) }) {
                     Icon(Icons.Default.Check, "Copy this folder")
                 }
             } else if (selected.isNotEmpty()) {
@@ -91,18 +96,23 @@ fun PickerScreen(foldersOnly: Boolean, onCancel: () -> Unit, onConfirm: (List<Fi
         },
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (loading || roots == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+            val rootList = roots
             if (dir == null) {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(roots, key = { it.dir.path }) { r ->
-                        ListItem(
-                            modifier = Modifier.clickable { dir = r.dir },
-                            leadingContent = {
-                                Icon(if (r.removable) Icons.Default.SdCard else Icons.Default.PhoneAndroid, null)
-                            },
-                            headlineContent = { Text(r.name) },
-                            supportingContent = { Text(r.dir.path) },
-                        )
+                if (rootList == null) {
+                    ShimmerList(rows = 3)
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(rootList, key = { it.dir.path }) { r ->
+                            ListItem(
+                                modifier = Modifier.clickable { dir = r.dir },
+                                leadingContent = {
+                                    Icon(if (r.removable) Icons.Default.SdCard else Icons.Default.PhoneAndroid, null)
+                                },
+                                headlineContent = { Text(r.name) },
+                                supportingContent = { Text(r.dir.path) },
+                            )
+                        }
                     }
                 }
             } else {
@@ -113,46 +123,47 @@ fun PickerScreen(foldersOnly: Boolean, onCancel: () -> Unit, onConfirm: (List<Fi
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                if (unreadable) {
-                    Text("This folder can't be read.", Modifier.padding(16.dp))
-                } else if (!loading && entries.isEmpty()) {
-                    Text("Nothing here.", Modifier.padding(16.dp))
-                }
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
-                    if (!atRoot) item(key = "..") {
-                        ListItem(
-                            modifier = Modifier.clickable { dir = dir?.parentFile },
-                            leadingContent = { Icon(Icons.Default.ArrowUpward, null) },
-                            headlineContent = { Text("..") },
-                        )
-                    }
-                    items(entries, key = { it.absolutePath }) { f ->
-                        val isDir = f.isDirectory
-                        ListItem(
-                            modifier = Modifier.clickable {
-                                if (isDir) dir = f
-                                else if (!foldersOnly) {
-                                    if (!selected.remove(f.absolutePath)) selected.add(f.absolutePath)
-                                }
-                            },
-                            leadingContent = {
-                                Icon(if (isDir) Icons.Default.Folder else Icons.Default.InsertDriveFile, null)
-                            },
-                            headlineContent = { Text(f.name, maxLines = 1) },
-                            supportingContent = if (!isDir) {
-                                { Text(Formatter.formatShortFileSize(context, f.length())) }
-                            } else null,
-                            trailingContent = if (!foldersOnly) {
-                                {
-                                    Checkbox(
-                                        checked = f.absolutePath in selected,
-                                        onCheckedChange = {
-                                            if (!selected.remove(f.absolutePath)) selected.add(f.absolutePath)
-                                        },
-                                    )
-                                }
-                            } else null,
-                        )
+                if (loading) {
+                    ShimmerList(rows = 8)
+                } else {
+                    if (unreadable) Text("This folder can't be read.", Modifier.padding(16.dp))
+                    else if (entries.isEmpty()) Text("Nothing here.", Modifier.padding(16.dp))
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
+                        if (!atRoot) item(key = "..") {
+                            ListItem(
+                                modifier = Modifier.clickable { dir = dir?.parentFile },
+                                leadingContent = { Icon(Icons.Default.ArrowUpward, null) },
+                                headlineContent = { Text("..") },
+                            )
+                        }
+                        items(entries, key = { it.absolutePath }) { f ->
+                            val isDir = f.isDirectory
+                            ListItem(
+                                modifier = Modifier.clickable {
+                                    if (isDir) dir = f
+                                    else if (!foldersOnly) {
+                                        if (!selected.remove(f.absolutePath)) selected.add(f.absolutePath)
+                                    }
+                                },
+                                leadingContent = {
+                                    Icon(if (isDir) Icons.Default.Folder else Icons.Default.InsertDriveFile, null)
+                                },
+                                headlineContent = { Text(f.name, maxLines = 1) },
+                                supportingContent = if (!isDir) {
+                                    { Text(Formatter.formatShortFileSize(context, f.length())) }
+                                } else null,
+                                trailingContent = if (!foldersOnly) {
+                                    {
+                                        Checkbox(
+                                            checked = f.absolutePath in selected,
+                                            onCheckedChange = {
+                                                if (!selected.remove(f.absolutePath)) selected.add(f.absolutePath)
+                                            },
+                                        )
+                                    }
+                                } else null,
+                            )
+                        }
                     }
                 }
             }

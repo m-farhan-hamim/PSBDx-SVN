@@ -1,6 +1,10 @@
 # 🚀 PSBDx-SVN
-
+<div align="center">
+    
+[![Recent donators](https://donate.psbdx.com/widget.svg?style=goal)](https://donate.psbdx.com/)
 [![Recent donators](https://donate.psbdx.com/widget.svg)](https://donate.psbdx.com/)
+
+</div>
 
 ---
 
@@ -15,12 +19,14 @@
 </div>
 
 ---
+
 <div align="center">
 
 [![GitHub](https://img.shields.io/badge/GitHub-m--farhan--hamim%2FPSBDx--SVN-181717?style=for-the-badge&logo=github)](https://github.com/m-farhan-hamim/PSBDx-SVN)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-Scanned%20%26%20Clean-394EFF?style=for-the-badge&logo=virustotal)](https://www.virustotal.com/gui/file/f6d93c81592dc89cf58886b93d05f4158132b96ff51fb86205215a8b760fcdf3/details)
 [![F-Droid](https://img.shields.io/badge/F--Droid-Coming%20Soon-1976D2?style=for-the-badge&logo=f-droid)](https://f-droid.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
+[![Recent donators](https://donate.psbdx.com/widget.svg?style=badge)](https://donate.psbdx.com/)
 
 **A modern, lightweight Android SVN client built with ❤️ for developers on the go.**
 
