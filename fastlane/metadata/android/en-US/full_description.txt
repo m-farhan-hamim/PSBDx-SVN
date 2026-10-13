@@ -21,7 +21,7 @@ PSBDx SVN is a modern, fully open-source Subversion client for Android. Check ou
 
 <b>Backup and restore, the F-Droid way</b>
 • Encrypted backup (AES-256-GCM with your own passphrase) to a local file, works with no account at all
-• Optional Google Drive backup using OAuth 2.0 with PKCE in your browser: no Google Play Services and no closed-source SDKs
+• Google Drive backup is optional and off by default. It signs in with your Google account in the browser (OAuth 2.0 with PKCE) and uploads one encrypted file to the app's private Drive folder. No Google Play Services and no closed-source SDKs are used
 • Automatic backup whenever you add or change a repository, plus manual Backup Now and Restore
 
 <b>Design</b>
@@ -30,6 +30,5 @@ PSBDx SVN is a modern, fully open-source Subversion client for Android. Check ou
 <b>Good to know</b>
 • Supports http, https and svn:// repositories (svn+ssh is not supported)
 • Browsing storage to upload files uses the "manage all files" permission, requested only when you first upload
-• Google Drive backup is only available in builds that include Google client credentials
 
 Found a bug or have an idea? Use Settings → Contact support to open an issue on GitHub.
