@@ -109,7 +109,7 @@ Built with a focus on performance and usability, this app is designed for develo
 | Source | Status | Link |
 |:---:|:---:|:---:|
 | **GitHub Releases** | ✅ Available | [Download APK](https://github.com/m-farhan-hamim/PSBDx-SVN/releases) |
-| **F-Droid** | ⏳ Coming Soon | *Not yet available* |
+| **F-Droid** | ✅ Available | [Download APK](https://f-droid.org/packages/com.dev.svn.psbdx) |
 | **Google Play** | ⏳ Coming Soon | *Not yet available* |
 
 </div>
